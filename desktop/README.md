@@ -1,18 +1,23 @@
 # Silly Pics Desktop App
 
-React + Vite desktop web app scaffold for creating and saving fun caricatures from camera portraits.
+React + Vite desktop web app for creating and saving fun caricatures from camera portraits, with an OpenAI-backed AI caricature mode.
 
 ## Stack
 - React 19 + Vite
-- Express API endpoint (`api/index.js`) for random style presets
-- Vercel config (`vercel.json`) for SPA + API rewrites
+- Express API (`api/index.js`) — random style presets + OpenAI `gpt-image-1` image edit
+- Vite dev server mounts the Express app as middleware so `npm run dev` serves both UI and `/api/*`
+- Vercel config (`vercel.json`) for SPA + API rewrites in production
 
 ## Local development
 ```bash
-cd /tmp/workspace/bob2314/silly-pics/desktop
+cd desktop
 npm install
-npm run dev
+npm run dev          # Vite + Express on the same port
+# or
+npm run dev:vercel   # `vercel dev` (requires `npm i -g vercel`)
 ```
+
+Set `OPENAI_API_KEY` in `desktop/.env.local` (see `.env.example`) to enable the AI Caricature button. Both `.env` and `.env.local` are gitignored.
 
 ## Validation
 ```bash

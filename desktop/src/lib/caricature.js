@@ -1,7 +1,7 @@
 export const STYLE_PRESETS = [
   {
-    id: 'comic-pop',
-    name: 'Comic Pop',
+    id: 'cosmic-pop',
+    name: 'Cosmic Pop',
     saturation: 1.65,
     contrast: 1.28,
     brightness: 1.06,
@@ -38,6 +38,26 @@ export const STYLE_PRESETS = [
     hueDeg: -4,
     exaggeration: 0.24,
     accent: '#22c3ff',
+  },
+  {
+    id: 'golden-studio',
+    name: 'Golden Studio',
+    saturation: 1.42,
+    contrast: 1.2,
+    brightness: 1.08,
+    hueDeg: 6,
+    exaggeration: 0.22,
+    accent: '#f6b73c',
+  },
+  {
+    id: 'ink-booth-sketch',
+    name: 'Ink Booth Sketch',
+    saturation: 0.2,
+    contrast: 1.45,
+    brightness: 1.12,
+    hueDeg: 0,
+    exaggeration: 0.34,
+    accent: '#1f2937',
   },
 ]
 
@@ -153,6 +173,65 @@ export function loadDataUrlImage(dataUrl) {
     image.onerror = () => reject(new Error('Failed to load captured portrait'))
     image.src = dataUrl
   })
+}
+
+export async function downscaleDataUrl(dataUrl, maxEdge = 1024) {
+  const image = await loadDataUrlImage(dataUrl)
+  const { naturalWidth: w, naturalHeight: h } = image
+
+  if (!w || !h) {
+    return dataUrl
+  }
+
+  const scale = Math.min(1, maxEdge / Math.max(w, h))
+
+  if (scale === 1) {
+    return dataUrl
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(w * scale)
+  canvas.height = Math.round(h * scale)
+
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+  return canvas.toDataURL('image/png')
+}
+
+export async function requestAiCaricature(dataUrl, style, { quality = 'low' } = {}) {
+  const prepared = await downscaleDataUrl(dataUrl, 1024)
+
+  const response = await fetch('/api/caricature', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: prepared, style, quality }),
+  })
+
+  if (!response.ok) {
+    let detail = ''
+
+    try {
+      const payload = await response.json()
+      detail = payload?.detail || payload?.error || ''
+    } catch {
+      try {
+        detail = await response.text()
+      } catch {
+        // ignore — fall through to generic error message below
+      }
+    }
+
+    throw new Error(detail || `AI caricature request failed (HTTP ${response.status})`)
+  }
+
+  const payload = await response.json()
+
+  if (!payload?.image) {
+    throw new Error('AI caricature response was missing an image.')
+  }
+
+  return payload.image
 }
 
 export async function buildBrandedImage(caricatureDataUrl) {

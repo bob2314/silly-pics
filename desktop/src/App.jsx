@@ -3,9 +3,9 @@ import './App.css'
 import {
   STYLE_PRESETS,
   buildBrandedImage,
-  fetchRandomStylePreset,
   loadDataUrlImage,
   renderCaricature,
+  requestAiCaricature,
 } from './lib/caricature'
 
 function App() {
@@ -18,7 +18,15 @@ function App() {
   const [capturedImage, setCapturedImage] = useState('')
   const [caricatureImage, setCaricatureImage] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isAiProcessing, setIsAiProcessing] = useState(false)
   const [activeStyle, setActiveStyle] = useState(STYLE_PRESETS[0])
+  const [aiQuality, setAiQuality] = useState('low')
+
+  const QUALITY_OPTIONS = [
+    { id: 'low', label: 'Low', hint: 'fastest, cheapest' },
+    { id: 'medium', label: 'Medium', hint: 'balanced' },
+    { id: 'high', label: 'High', hint: 'slowest, prettiest' },
+  ]
 
   useEffect(() => {
     const videoElement = videoRef.current
@@ -37,6 +45,12 @@ function App() {
     setCameraError('')
 
     try {
+      if (videoRef.current?.srcObject) {
+        await videoRef.current.play()
+        setCameraOn(true)
+        return
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
@@ -102,9 +116,28 @@ function App() {
     }
   }
 
-  const randomizeStyle = async () => {
-    const randomStyle = await fetchRandomStylePreset()
-    setActiveStyle(randomStyle)
+  const generateAiCaricature = async () => {
+    setIsAiProcessing(true)
+    setCameraError('')
+
+    try {
+      const source = capturedImage || capturePortrait()
+
+      if (!source) {
+        throw new Error('No image available')
+      }
+
+      const aiImage = await requestAiCaricature(source, activeStyle, { quality: aiQuality })
+      setCaricatureImage(aiImage)
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? `AI caricature failed: ${error.message}`
+          : 'AI caricature failed. Capture a portrait, then try again.'
+      setCameraError(message)
+    } finally {
+      setIsAiProcessing(false)
+    }
   }
 
   const saveBrandedCaricature = async () => {
@@ -151,12 +184,59 @@ function App() {
             <button type="button" onClick={capturePortrait}>
               Capture Portrait
             </button>
-            <button type="button" className="subtle" onClick={randomizeStyle}>
-              Random Style
+            <button
+              type="button"
+              className="primary"
+              onClick={generateCaricature}
+              disabled={isProcessing || isAiProcessing}
+            >
+              {isProcessing ? 'Creating…' : 'Quick Filter'}
             </button>
-            <button type="button" className="primary" onClick={generateCaricature} disabled={isProcessing}>
-              {isProcessing ? 'Creating…' : 'Create Caricature'}
+            <button
+              type="button"
+              className="primary ai"
+              onClick={generateAiCaricature}
+              disabled={isProcessing || isAiProcessing}
+            >
+              {isAiProcessing ? 'Drawing…' : 'AI Caricature'}
             </button>
+          </div>
+
+          <div className="style-picker" role="group" aria-label="Caricature style">
+            <span className="control-label">Style</span>
+            <div className="style-options">
+              {STYLE_PRESETS.map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  className={`style-chip ${activeStyle.id === style.id ? 'active' : ''}`}
+                  onClick={() => setActiveStyle(style)}
+                  disabled={isProcessing || isAiProcessing}
+                  aria-pressed={activeStyle.id === style.id}
+                >
+                  {style.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="quality-picker" role="group" aria-label="AI caricature quality">
+            <span className="control-label">AI quality</span>
+            <div className="quality-options">
+              {QUALITY_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`quality-chip ${aiQuality === option.id ? 'active' : ''}`}
+                  onClick={() => setAiQuality(option.id)}
+                  disabled={isAiProcessing}
+                  title={option.hint}
+                  aria-pressed={aiQuality === option.id}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <p className="style-label">
